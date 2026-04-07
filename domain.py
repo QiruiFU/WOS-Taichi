@@ -5,60 +5,27 @@ import taichi.math as tm
 
 class BaseDomain():
     """
-    Abstract base class for all problem domains.
-
     Subclasses must implement:
-      - the Taichi @ti.func methods dist_to_boundary / boundary_value
-        (these are plain Python methods wrapping @ti.func logic, or
-         directly decorated — see concrete classes below)
+      - the Taichi @ti.func methods dist_to_boundary / boundary_value; positive distance inside domain
       - grid_info(N) → (interior_mask, boundary_mask, bc_values)
     """
 
     def dist_to_boundary(self, x: tm.vec2) -> float:
-        """Distance from point x to the nearest point on ∂Ω."""
         raise NotImplementedError
 
     def boundary_value(self, x: tm.vec2) -> float:
-        """Dirichlet value g(x) at (or near) the boundary."""
         raise NotImplementedError
 
     def grid_info(self, N: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Return grid metadata for an (N+2)×(N+2) FD grid whose nodes
-        span the bounding box of this domain.
-
-        Returns
-        -------
-        interior_mask : bool ndarray (N+2, N+2)
-            True  → node is inside Ω and should be updated by G-S.
-            False → exterior or boundary node (frozen).
-        boundary_mask : bool ndarray (N+2, N+2)
-            True  → node carries a prescribed Dirichlet value.
-        bc_values : float ndarray (N+2, N+2)
-            Dirichlet value at each boundary node (0 elsewhere).
-        """
         raise NotImplementedError
 
     @property
     def bbox(self) -> tuple[np.ndarray, np.ndarray]:
-        """Return (lo, hi) corners of the bounding box as numpy arrays."""
         raise NotImplementedError
 
 
 @ti.data_oriented
 class SquareDomain(BaseDomain):
-    """
-    Axis-aligned square domain [lo, hi]².
-
-    Boundary condition:
-      u = 1  on the top edge
-      u = 0  on all other edges
-
-    The bounding box *is* the domain, so interior_mask is 1 everywhere
-    in the interior and the FD grid reduces to the original ghost-cell
-    layout from fd.py.
-    """
-
     def __init__(self,
                  lo: ti.template() = ti.Vector([0.0, 0.0]),
                  hi: ti.template() = ti.Vector([1.0, 1.0])):
@@ -70,6 +37,13 @@ class SquareDomain(BaseDomain):
     @property
     def bbox(self):
         return self._lo_np, self._hi_np
+
+    def _dist_numpy(self, x: np.ndarray) -> float:
+        d_left   = x[0] - self._lo_np[0]
+        d_right  = self._hi_np[0] - x[0]
+        d_bottom = x[1] - self._lo_np[1]
+        d_top    = self._hi_np[1] - x[1]
+        return min(d_left, d_right, d_bottom, d_top)
 
     @ti.func
     def dist_to_boundary(self, x: tm.vec2) -> float:
@@ -86,7 +60,7 @@ class SquareDomain(BaseDomain):
         d_bottom = x[1] - self.lo[1]
         d_top    = self.hi[1] - x[1]
         d_min = ti.min(d_left, d_right, d_bottom, d_top)
-        val = 0.0
+        val = -1.0
         if d_top == d_min:
             val = 1.0
         return val
@@ -115,7 +89,6 @@ class SquareDomain(BaseDomain):
         return interior_mask, boundary_mask, bc_values
 
     def _bc_numpy(self, x: np.ndarray) -> float:
-        """Python version of boundary_value for grid_info construction."""
         lo, hi = self._lo_np, self._hi_np
         d_top = hi[1] - x[1]
         d_others = min(x[0] - lo[0], hi[0] - x[0], x[1] - lo[1])
@@ -124,16 +97,6 @@ class SquareDomain(BaseDomain):
 
 @ti.data_oriented
 class CircleDomain(BaseDomain):
-    """
-    Circular domain  { x : |x - c|² ≤ r² }.
-
-    Boundary condition:
-      u = 1  on the top half  (y ≥ cy)
-      u = 0  on the bottom half (y < cy)
-
-    SDF is exact: dist = r - |x - c|  (positive inside)
-    """
-
     def __init__(self, cx: float = 0.5, cy: float = 0.5, r: float = 0.4):
         self.cx = cx
         self.cy = cy
@@ -146,9 +109,8 @@ class CircleDomain(BaseDomain):
         return self._lo_np, self._hi_np
 
     def _dist_numpy(self, x: np.ndarray) -> float:
-        """Signed distance: negative inside, positive outside."""
         d = np.hypot(x[0] - self.cx, x[1] - self.cy)
-        return d - self.r
+        return self.r - d
 
     def _bc_numpy(self, x: np.ndarray) -> float:
         px = x[0] - self.cx
@@ -157,7 +119,7 @@ class CircleDomain(BaseDomain):
         if norm < 1e-12:
             return 0.0
         ny = py / norm
-        return 1.0 if ny >= 0.0 else 0.0
+        return 1.0 if ny >= 0.0 else -1.0
 
     @ti.func
     def dist_to_boundary(self, x):
@@ -171,7 +133,7 @@ class CircleDomain(BaseDomain):
         py = x[1] - ti.static(self.cy)
         norm = tm.sqrt(px * px + py * py)
         ny = py / ti.select(norm > 1e-12, norm, 1.0)
-        return ti.select(ny >= 0.0, 1.0, 0.0)
+        return ti.select(ny >= 0.0, 1.0, -1.0)
 
     def grid_info(self, N: int):
         lo, hi = self._lo_np, self._hi_np
@@ -190,9 +152,9 @@ class CircleDomain(BaseDomain):
                 pt = np.array([xs[i], ys[j]])
                 d  = self._dist_numpy(pt)
 
-                if d > 0:
+                if d < 0:
                     pass
-                elif d > -1.5 * h:
+                elif d < 1.5 * h:
                     boundary_mask[i, j] = True
                     bc_values[i, j]     = self._bc_numpy(pt)
                 else:

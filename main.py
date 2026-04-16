@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 ti.init(arch=ti.gpu)
 
-from domain import SquareDomain, CircleDomain
+from domains.domain import SquareDomain, CircleDomain
 from fd    import FDSolver,  visualise as fd_vis
 from WoSt   import WoSSolver, visualise as wos_vis
 

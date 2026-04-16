@@ -65,6 +65,7 @@ class WoStSolver:
 
     @ti.func
     def sample_direction(self, on_neumann: int, normal: tm.vec2) -> tm.vec2:
+        normal = tm.normalize(normal)
         v = tm.vec2(0.0, 0.0)
         if on_neumann == 0:
             angle = 2.0 * tm.pi * ti.random()
@@ -92,21 +93,24 @@ class WoStSolver:
                     self.walkers[i].value = self.domain.boundary_value(x)
                     self.walkers[i].terminated = 1
                 else:
-                    # source 积分（与原版相同，保留不动）
-                    # N_src       = 100
-                    # src_val_sum = 0.0
-                    # for k in range(N_src):
-                    #     r         = R * ti.sqrt(ti.random())
-                    #     theta     = 2.0 * tm.pi * ti.random()
-                    #     src_point = x + r * tm.vec2(tm.cos(theta), tm.sin(theta))
-                    #     f_val     = self.domain.source(src_point)
-                    #     G         = tm.log(R / r) / (2.0 * tm.pi)
-                    #     src_val_sum += f_val * G
-                    # self.walkers[i].source_val -= (src_val_sum / N_src) * (tm.pi * R * R)
-
+                    # walk on star
                     v = self.sample_direction(on_neumann, normal)
-                    next_step, on_neumann, normal = self.domain.intersect_ray(x, v, R)
+                    t_min, on_neumann, normal = self.domain.intersect_ray(x, v, R)
+                    next_step = x + t_min * v
+
+                    # source
+                    t_sample  = R * ti.sqrt(ti.random())
+                    contribution = 0.0
+                    if t_sample < t_min:
+                        src_point = x + t_sample * v
+                        f_val     = self.domain.source(src_point)
+                        G         = tm.log(R / t_sample) / (2.0 * tm.pi)
+                        contribution = f_val * G
+
+                    self.walkers[i].source_val -= contribution * (tm.pi * R * R)
                     self.walkers[i].pos = next_step
+                    self.walkers[i].normal = normal
+                    self.walkers[i].on_neumann = on_neumann
                     self.walkers[i].step += 1
 
                     if self.walkers[i].step >= self.max_steps:
@@ -173,16 +177,16 @@ def visualise(solver: WoStSolver, title: str = "WoSt solution",
 
 
 if __name__ == "__main__":
-    from domain import SquareDomain, CircleDomain
+    from domains.domain import SquareDomain, CircleDomain
 
     ti.init(arch=ti.gpu)
 
-    domain = SquareDomain(lo=ti.Vector([0.0, 0.0]),
-                          hi=ti.Vector([1.0, 1.0]))
+    # domain = SquareDomain(lo=ti.Vector([0.0, 0.0]),
+    #                       hi=ti.Vector([1.0, 1.0]))
 
-    # domain = CircleDomain()
+    domain = CircleDomain()
 
-    solver = WoStSolver(domain=domain, dx=1/256, n_walks=2000,
+    solver = WoStSolver(domain=domain, dx=1/256, n_walks=8000,
                         epsilon=1e-5, max_steps=10000)
 
     print(f"Running WoSt ({solver.n_samples} samples, {solver.n_walks} walks) …")

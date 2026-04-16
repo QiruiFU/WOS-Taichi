@@ -60,16 +60,16 @@ class SquareDomain(BaseDomain):
                  hi: ti.template() = ti.Vector([1.0, 1.0])):
         self.lo = lo
         self.hi = hi
-        self._lo_np = lo.to_numpy() if hasattr(lo, "to_numpy") else np.array(lo)
-        self._hi_np = hi.to_numpy() if hasattr(hi, "to_numpy") else np.array(hi)
+        self.lo_np = lo.to_numpy() if hasattr(lo, "to_numpy") else np.array(lo)
+        self.hi_np = hi.to_numpy() if hasattr(hi, "to_numpy") else np.array(hi)
 
     @property
     def bbox(self):
-        return self._lo_np, self._hi_np
+        return self.lo_np, self.hi_np
 
     # Finite difference
     def bc_numpy(self, x: np.ndarray):
-        lo, hi = self._lo_np, self._hi_np
+        lo, hi = self.lo_np, self.hi_np
         d_left   = x[0] - lo[0]
         d_right  = hi[0] - x[0]
         d_bottom = x[1] - lo[1]
@@ -87,10 +87,15 @@ class SquareDomain(BaseDomain):
             return 0, 0.0, np.array([1.0,  0.0], dtype=np.float32)
 
     def source_numpy(self, x: np.ndarray) -> float:
-        return 0.0
+        center = (self.lo_np + self.hi_np) * 0.5
+        dis = abs(x[0] - center[0]) + abs(x[1] - center[1])
+        src = 0
+        if dis < 0.2:
+            src = 20.0
+        return src
 
     def grid_info(self, N: int):
-        lo, hi = self._lo_np, self._hi_np
+        lo, hi = self.lo_np, self.hi_np
         M = N + 2
         xs = np.linspace(lo[0], hi[0], M)
         ys = np.linspace(lo[1], hi[1], M)
@@ -152,22 +157,31 @@ class SquareDomain(BaseDomain):
 
     @ti.func
     def source(self, x: tm.vec2) -> float:
-        return 0.0
+        center = (self.lo + self.hi) * 0.5
+        dis = ti.abs(x[0] - center[0]) + ti.abs(x[1] - center[1])
+        src = 0.0
+        if dis < 0.2:
+            src = 20.0
+        return src
 
     @ti.func
     def intersect_ray(self, x: tm.vec2, v: tm.vec2, R: float):
         t_min = R
-        on_Neumann = False
+        on_Neumann = 0
         n_hit = tm.vec2(0.0, 0.0)
 
         if v[0] < 0.0:
             t = (self.lo[0] - x[0]) / v[0]
             if t > 0.0 and t < t_min:
                 t_min = t
-                on_Neumann = True
+                on_Neumann = 1
                 n_hit = tm.vec2(-1.0, 0.0)
 
-        return x + t_min * v, on_Neumann, n_hit
+        # if ti.abs(x[0] + t_min * v[0]) < 1e-3:
+        #     on_Neumann = 1
+        #     n_hit = tm.vec2(-1.0, 0.0)
+
+        return t_min, on_Neumann, n_hit
 
 @ti.data_oriented
 class CircleDomain(BaseDomain):
@@ -175,12 +189,12 @@ class CircleDomain(BaseDomain):
         self.cx = cx
         self.cy = cy
         self.r  = r
-        self._lo_np = np.array([cx - r, cy - r], dtype=np.float64)
-        self._hi_np = np.array([cx + r, cy + r], dtype=np.float64)
+        self.lo_np = np.array([cx - r, cy - r], dtype=np.float64)
+        self.hi_np = np.array([cx + r, cy + r], dtype=np.float64)
 
     @property
     def bbox(self):
-        return self._lo_np, self._hi_np
+        return self.lo_np, self.hi_np
 
     # ------------------------------------------------------------------ #
     # Finite difference
@@ -202,10 +216,14 @@ class CircleDomain(BaseDomain):
             return 1, 0.0, normal
 
     def source_numpy(self, x: np.ndarray) -> float:
-        return 0.0
+        dis = np.hypot(x[0] - self.cx, x[1] - self.cy)
+        val = 0.0
+        if dis < 0.1:
+            val = -80.0
+        return val
 
     def grid_info(self, N: int):
-        lo, hi = self._lo_np, self._hi_np
+        lo, hi = self.lo_np, self.hi_np
         M = N + 2
         h = (hi[0] - lo[0]) / (M - 1)
         xs = np.linspace(lo[0], hi[0], M)
@@ -254,12 +272,17 @@ class CircleDomain(BaseDomain):
 
     @ti.func
     def source(self, x: tm.vec2) -> float:
-        return 0.0
+        v = tm.vec2(x[0] - self.cx, x[1] - self.cy)
+        dis = tm.sqrt(v[0] * v[0] + v[1] * v[1])
+        val = 0.0
+        if dis < 0.1:
+            val = -80.0
+        return val
 
     @ti.func
     def intersect_ray(self, x: tm.vec2, v: tm.vec2, R: float):
         t_min  = R
-        on_Neumann = False
+        on_Neumann = 0
         n_hit  = tm.vec2(0.0, 0.0)
 
         cx = ti.static(self.cx)
@@ -274,11 +297,11 @@ class CircleDomain(BaseDomain):
 
         if t < t_min and v[0] < 0.0 and v[1] < 0.0:
             t_min  = t
-            on_Neumann = True
+            on_Neumann = 1
             y_hit = x + t * v
             n_hit  = tm.normalize(y_hit - tm.vec2(cx, cy))
 
-        return x + t_min * v, on_Neumann, n_hit
+        return t_min, on_Neumann, n_hit
 
     @ti.func
     def dist_to_dirichlet(self, x: tm.vec2) -> float:

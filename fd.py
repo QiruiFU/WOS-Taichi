@@ -148,7 +148,7 @@ def visualise(solver: FDSolver, title: str = "FD solution",
 
 if __name__ == "__main__":
     import taichi as ti
-    from domain import SquareDomain, CircleDomain
+    from domains.domain import SquareDomain, CircleDomain
 
     ti.init(arch=ti.gpu)
 
@@ -157,9 +157,9 @@ if __name__ == "__main__":
     TOL         = 1e-2
     CHECK_EVERY = 2000
 
-    domain = SquareDomain(lo=ti.Vector([0.0, 0.0]),
-                          hi=ti.Vector([1.0, 1.0]))
-    # domain = CircleDomain()
+    # domain = SquareDomain(lo=ti.Vector([0.0, 0.0]),
+    #                       hi=ti.Vector([1.0, 1.0]))
+    domain = CircleDomain()
 
     solver = FDSolver(domain=domain, N=GRID_RES)
     print("Running Finite Difference solver  (red-black Gauss-Seidel) …")

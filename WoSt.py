@@ -160,12 +160,12 @@ class WoStSolver:
 
 
 def visualise(solver: WoStSolver, title: str = "WoSt solution",
-              save_path: str = "./img/wost_solution.png"):
+              save_path: str = "./img/wost_solution.png", v_min: float = None, v_max: float = None):
     values, origins = solver.get_solution_numpy()
     cmap = plt.cm.RdBu_r.copy()
     fig, ax = plt.subplots(figsize=(6, 5))
     sc = ax.scatter(origins[:, 0], origins[:, 1],
-                    c=values, cmap=cmap, s=4)
+                    c=values, cmap=cmap, s=4, vmin=v_min, vmax=v_max)
     plt.colorbar(sc, ax=ax)
     ax.set_title(title)
     ax.set_xlabel("x")
@@ -173,22 +173,3 @@ def visualise(solver: WoStSolver, title: str = "WoSt solution",
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, facecolor='white')
     print(f"Figure saved to {save_path}")
-    plt.show()
-
-
-if __name__ == "__main__":
-    from domains.domain import SquareDomain, CircleDomain
-
-    ti.init(arch=ti.gpu)
-
-    # domain = SquareDomain(lo=ti.Vector([0.0, 0.0]),
-    #                       hi=ti.Vector([1.0, 1.0]))
-
-    domain = CircleDomain()
-
-    solver = WoStSolver(domain=domain, dx=1/256, n_walks=8000,
-                        epsilon=1e-5, max_steps=10000)
-
-    print(f"Running WoSt ({solver.n_samples} samples, {solver.n_walks} walks) …")
-    solver.solve()
-    visualise(solver, title="WoSt — Square domain")

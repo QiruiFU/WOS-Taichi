@@ -110,7 +110,7 @@ class FDSolver:
 
 
 def visualise(solver: FDSolver, title: str = "FD solution",
-              save_path: str = "./img/fd_solution.png"):
+              save_path: str = "./img/fd_solution.png", v_min: float = None, v_max: float = None):
     u_np   = solver.get_solution_numpy()
     mask   = solver.get_interior_mask_numpy()
 
@@ -133,7 +133,7 @@ def visualise(solver: FDSolver, title: str = "FD solution",
     sc = ax.scatter(X, Y,
                     c=values,
                     cmap=cmap,
-                    s=4)
+                    s=4, vmin=v_min, vmax=v_max)
 
     plt.colorbar(sc, ax=ax)
     ax.set_title(title)
@@ -142,26 +142,4 @@ def visualise(solver: FDSolver, title: str = "FD solution",
 
     plt.tight_layout()
     plt.savefig(save_path, dpi=150, facecolor='white')
-    print(f"Figure saved to {save_path}")
-    plt.show()
-
-
-if __name__ == "__main__":
-    import taichi as ti
-    from domains.domain import SquareDomain, CircleDomain
-
-    ti.init(arch=ti.gpu)
-
-    GRID_RES    = 256
-    MAX_ITERS   = 200_000
-    TOL         = 1e-2
-    CHECK_EVERY = 2000
-
-    # domain = SquareDomain(lo=ti.Vector([0.0, 0.0]),
-    #                       hi=ti.Vector([1.0, 1.0]))
-    domain = CircleDomain()
-
-    solver = FDSolver(domain=domain, N=GRID_RES)
-    print("Running Finite Difference solver  (red-black Gauss-Seidel) …")
-    solver.solve(max_iters=MAX_ITERS, tol=TOL, check_every=CHECK_EVERY)
-    visualise(solver, title="FD — Square domain")
+    print(f"Figure saved to {save_path}\n")

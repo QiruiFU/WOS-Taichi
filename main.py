@@ -4,32 +4,65 @@ import matplotlib.pyplot as plt
 
 ti.init(arch=ti.gpu)
 
-from domains.domain import SquareDomain, CircleDomain
 from fd    import FDSolver,  visualise as fd_vis
-from WoSt   import WoSSolver, visualise as wos_vis
+from WoSt   import WoStSolver, visualise as wost_vis
+from domains.Dirichlet import SquareDirichlet
+from domains.Neumann import SquareNeumann, CircleNeumann
+from domains.source import SquareSource, CircleSource
 
-domain = CircleDomain(cx=0.5, cy=0.5, r=0.5)
-# domain = SquareDomain(lo=(0.0, 0.0), hi=(1.0, 1.0))
+domain_dirichlet = SquareDirichlet()
+domain_neumann_square = SquareNeumann()
+domain_neumann_circle = CircleNeumann()
+domain_source_square = SquareSource()
+domain_source_circle = CircleSource()
 
 # ---------------------------------------------------------------------------
 # FD solve
 # ---------------------------------------------------------------------------
-fd_solver = FDSolver(domain=domain, N=256)
-fd_solver.solve(max_iters=200_000, tol=1e-6, check_every=5000)
-fd_vis(fd_solver, title="FD — Circle domain", save_path="./img/fd_circle.png")
+# fd_solver = FDSolver(domain=domain_dirichlet, N=256)
+# fd_solver.solve(max_iters=200_000, tol=1e-3, check_every=5000)
+# fd_vis(fd_solver, title="FD — Square domain", save_path="./img/fd_dirichlet.png")
+
+# fd_solver = FDSolver(domain=domain_neumann_square, N=256)
+# fd_solver.solve(max_iters=200_000, tol=1e-3, check_every=5000)
+# fd_vis(fd_solver, title="FD — Square domain", save_path="./img/fd_neumann_square.png")
+
+# fd_solver = FDSolver(domain=domain_neumann_circle, N=256)
+# fd_solver.solve(max_iters=200_000, tol=1e-3, check_every=5000)
+# fd_vis(fd_solver, title="FD — Circle domain", save_path="./img/fd_neumann_circle.png")
+
+# fd_solver = FDSolver(domain=domain_source_square, N=256)
+# fd_solver.solve(max_iters=200_000, tol=1e-3, check_every=5000)
+# fd_vis(fd_solver, title="FD — Square domain", save_path="./img/fd_source_square.png")
+
+fd_solver = FDSolver(domain=domain_source_circle, N=256)
+fd_solver.solve(max_iters=200_000, tol=1e-3, check_every=5000)
+fd_vis(fd_solver, title="FD — Circle domain", save_path="./img/fd_source_circle.png", v_min=-1.0, v_max=1.5)
 
 # ---------------------------------------------------------------------------
-# WoS solve
+# WoSt solve
 # ---------------------------------------------------------------------------
-print()
-print("=" * 60)
-print("Walk-on-Spheres solver — Circle domain")
-print("=" * 60)
-wos_solver = WoSSolver(domain=domain,
-                       dx = 1 / 256,
-                       n_walks=5000,
-                       epsilon=1e-4,
-                       max_steps=10000)
-print(f"Running WoS  ({wos_solver.n_samples} samples, {wos_solver.n_walks} walks) …")
-wos_solver.solve(check_every=400)
-wos_vis(wos_solver, title="WoS — Circle domain", save_path="./img/wos_circle.png")
+# wost_solver = WoStSolver(domain=domain_dirichlet, dx = 1 / 256,
+#                        n_walks=8000, epsilon=1e-4, max_steps=10000)
+# wost_solver.solve(check_every=1000)
+# wost_vis(wost_solver, title="WoSt — Circle domain", save_path="./img/WoSt_dirichlet.png")
+
+# wost_solver = WoStSolver(domain=domain_neumann_square, dx = 1 / 256,
+#                        n_walks=8000, epsilon=1e-4, max_steps=10000)
+# wost_solver.solve(check_every=1000)
+# wost_vis(wost_solver, title="WoSt — Square domain", save_path="./img/WoSt_neumann_square.png")
+
+# wost_solver = WoStSolver(domain=domain_neumann_circle, dx = 1 / 256,
+#                        n_walks=8000, epsilon=1e-4, max_steps=10000)
+# wost_solver.solve(check_every=1000)
+# wost_vis(wost_solver, title="WoSt — Circle domain", save_path="./img/WoSt_neumann_circle.png")
+
+# wost_solver = WoStSolver(domain=domain_source_square, dx = 1 / 256,
+#                        n_walks=8000, epsilon=1e-4, max_steps=10000)
+# wost_solver.solve(check_every=1000)
+# wost_vis(wost_solver, title="WoSt — Square domain", save_path="./img/WoSt_source_square.png")
+
+wost_solver = WoStSolver(domain=domain_source_circle, dx = 1 / 256,
+                       n_walks=8000, epsilon=1e-4, max_steps=10000)
+wost_solver.solve(check_every=1000)
+wost_vis(wost_solver, title="WoSt — Circle domain", save_path="./img/WoSt_source_circle.png", v_min=-1.0, v_max=1.5)
